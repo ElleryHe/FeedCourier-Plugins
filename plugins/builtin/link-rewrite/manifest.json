@@ -1,0 +1,20 @@
+{
+  "id": "link-rewrite",
+  "name": "Link Rewrite (YOURLS)",
+  "version": "0.3.1",
+  "api_version": "1",
+  "kind": "builtin",
+  "runtime": "builtin",
+  "min_core": "0.3.0",
+  "category": "links",
+  "icon": "link",
+  "description": {
+    "en": "Rewrite outgoing article links using one or more self-hosted YOURLS short-link providers at delivery time, with SQLite caching, domain exclusions, and optional strict retry mode.",
+    "zh": "在推送渲染阶段通过一个或多个自建 YOURLS 短链服务重写文章链接，内置 SQLite 缓存、域名排除规则与可选严格重试模式。"
+  },
+  "homepage": "https://feedcourier.ellery.me/plugins/link-rewrite",
+  "repository": "https://github.com/ElleryHe/FeedCourier",
+  "hooks": ["on_render"],
+  "permissions": ["network"],
+  "allowed_hosts": []
+}

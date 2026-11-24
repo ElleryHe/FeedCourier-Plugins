@@ -1,11 +1,12 @@
-name: Validate Plugin Registry
+name: Validate Plugin Marketplace
 
 on:
   pull_request:
     paths:
-      - "registry/**"
+      - "plugins/**"
       - "schema/**"
-      - "channels/**"
+      - "templates/**"
+      - "tests/**"
       - "index.json"
       - "scripts/build-index.mjs"
       - ".github/workflows/validate.yml"
@@ -13,9 +14,10 @@ on:
     branches:
       - main
     paths:
-      - "registry/**"
+      - "plugins/**"
       - "schema/**"
-      - "channels/**"
+      - "templates/**"
+      - "tests/**"
       - "index.json"
       - "scripts/build-index.mjs"
       - ".github/workflows/validate.yml"
@@ -30,7 +32,7 @@ concurrency:
 
 jobs:
   validate:
-    name: Validate Manifests & Bridge Tests (Node 24)
+    name: Validate Plugins & Unit Tests (Node 24)
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
@@ -51,11 +53,11 @@ jobs:
             exit 1
           fi
 
-      - name: Validate plugin manifests against schema (pull request)
+      - name: Validate plugins and manifests against schema (pull request)
         if: github.event_name == 'pull_request'
         run: node scripts/build-index.mjs --check
 
-      - name: Validate plugin manifests (and verify index.json freshness when not pending auto-rebuild)
+      - name: Validate plugins (and verify index.json freshness when not pending auto-rebuild)
         if: github.event_name != 'pull_request'
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
@@ -63,12 +65,12 @@ jobs:
             exit 0
           fi
           CHANGED="$(git diff --name-only HEAD~1 HEAD 2>/dev/null || true)"
-          if printf '%s\n' "${CHANGED}" | grep -Eq '^(registry/|schema/|scripts/build-index\.mjs$)' && ! printf '%s\n' "${CHANGED}" | grep -qx 'index.json'; then
-            echo "Registry/schema changed without index.json (merged PR; build-index.yml rebuilds index.json asynchronously); running schema validation without --verify-index."
+          if printf '%s\n' "${CHANGED}" | grep -Eq '^(plugins/|schema/|scripts/build-index\.mjs$)' && ! printf '%s\n' "${CHANGED}" | grep -qx 'index.json'; then
+            echo "Plugins/schema changed without index.json (merged PR; build-index.yml rebuilds index.json asynchronously); running validation without --verify-index."
             node scripts/build-index.mjs --check
           else
             node scripts/build-index.mjs --check --verify-index
           fi
 
-      - name: Run zero-dependency channel bridge unit tests
-        run: node --test channels/*/*.test.mjs
+      - name: Run zero-dependency JS plugin unit tests
+        run: node --test tests/*.test.mjs

@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - "registry/**"
+      - "plugins/**"
       - "schema/**"
       - "scripts/build-index.mjs"
   workflow_dispatch:
@@ -32,7 +32,7 @@ jobs:
         with:
           node-version: 24
 
-      - name: Validate registry and rebuild index.json
+      - name: Validate plugins and rebuild index.json
         run: node scripts/build-index.mjs
 
       - name: Verify rebuilt index.json

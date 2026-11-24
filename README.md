@@ -1,56 +1,63 @@
-# FeedCourier Plugins Registry
+# FeedCourier Plugins Marketplace
 
-Official plugin marketplace registry, **Plugin Protocol v1** schemas, and reference HTTP Bridge channel plugins for **[FeedCourier](https://github.com/ElleryHe/FeedCourier)** (`v0.3.0+`).
+Official single-file JavaScript plugin marketplace, **Plugin API v1** specification, and built-in plugin catalog for **[FeedCourier](https://github.com/ElleryHe/FeedCourier)** (`v0.3.1+`).
 
-**English** | [简体中文](./README.zh-CN.md) | [FeedCourier Docs](https://feedcourier.ellery.me/plugins/)
+**English** | [简体中文](./README.zh-CN.md) | [Plugin API v1](./docs/plugin-api/v1.md) | [Marketplace Spec](./docs/marketplace.md)
 
 ---
 
-## How the Marketplace Index Works
+## Highlights
 
-1. Each plugin listing lives as an individual JSON file under [`registry/<id>.json`](./registry/) conforming strictly to [`schema/manifest.schema.json`](./schema/manifest.schema.json) (JSON Schema Draft 2020-12, Plugin Protocol `api_version: "1"`).
-2. Out-of-process **HTTP Bridge Plugins** (`runtime: "bridge"`, `FeedCourier >= 0.3.1`) follow [`schema/bridge-protocol.schema.json`](./schema/bridge-protocol.schema.json) (`GET /manifest`, `POST /validate`, `POST /test`, `POST /deliver`, `POST /hooks/on_render`, `POST /hooks/on_delivered`, HMAC-SHA256 signed with a `±300s` replay window).
-3. On every pull request, GitHub Actions validates all manifests (`node scripts/build-index.mjs --check`) and runs the zero-dependency Node.js 24 bridge test suite (`node --test channels/*/*.test.mjs`).
-4. When merged to `main`, GitHub Actions automatically rebuilds and commits [`index.json`](./index.json). Running FeedCourier instances fetch it with a 6-hour cache and an offline snapshot fallback.
+- **Single-file JS Plugins (`plugin.js`)**: Every channel or processor plugin release is a self-contained ES Module executed synchronously inside FeedCourier's embedded pure-ECMAScript sandbox (`globalThis.fc`) — **no Docker sidecars, no external Node.js daemon, one-click install from WebUI**.
+- **SHA-256 Verified Releases**: [`scripts/build-index.mjs`](./scripts/build-index.mjs) validates every plugin, enforces zero-import & sandbox compliance, computes exact UTF-8 `sha256` checksums, and builds [`index.json`](./index.json).
+- **Zero-dependency Tooling & Tests**: Validation, index generation, and unit tests run natively on **Node.js 24+** with zero npm dependencies.
 
-## Repository Layout
+## Official Plugins
+
+| Plugin | Kind | Runtime | Description |
+| --- | --- | --- | --- |
+| [**Bark Push**](./plugins/channels/bark/) | `channel` | `js` | Push RSS article summaries to iOS/macOS via Bark (`api.day.app` or self-hosted) in Telegram Compact Card style |
+| [**ntfy Push**](./plugins/channels/ntfy/) | `channel` | `js` | Deliver RSS articles as push notifications to `ntfy.sh` or self-hosted ntfy servers |
+| [**Link Rewrite (YOURLS)**](./plugins/builtin/link-rewrite/) | `builtin` | `builtin` | Rewrite outgoing article links via self-hosted YOURLS providers with SQLite caching |
+
+## Repository Structure
 
 ```text
-schema/manifest.schema.json          # Draft 2020-12 JSON Schema for Plugin Protocol v1 manifests
-schema/bridge-protocol.schema.json   # HTTP Bridge Protocol v1 wire request/response schemas
-registry/link-rewrite.json           # Built-in Link Rewrite (YOURLS) processor plugin
-registry/ntfy.json                   # Reference ntfy Push HTTP Bridge channel plugin
-channels/channel-template/           # Zero-dependency Node.js 24 starter kit + Dockerfile + tests
-channels/ntfy/                       # Reference ntfy channel bridge implementation + Dockerfile + tests
-scripts/build-index.mjs              # Zero-dependency Node.js 24+ validator & index builder
-index.json                           # Aggregated marketplace index (auto-generated on main)
-.github/workflows/validate.yml       # PR manifest validation & channel bridge unit tests
-.github/workflows/build-index.yml    # Automatic index.json rebuild on push to main
+plugins/
+  builtin/link-rewrite/              # Built-in Rust plugin manifest & docs
+  channels/ntfy/0.3.1/plugin.js      # Official ntfy Push channel plugin
+  channels/bark/0.3.1/plugin.js      # Official Bark Push channel plugin (Compact Card style)
+docs/
+  marketplace.md                     # Marketplace architecture & index.json format
+  plugin-api/v1.md                   # Plugin API v1 documentation
+  plugin-api/v1.d.ts                 # TypeScript ambient definitions for globalThis.fc & hooks
+templates/
+  channel-plugin.example.js          # Single-file channel plugin starter template
+  processor-plugin.example.js        # Single-file processor plugin starter template
+schema/manifest.schema.json          # Draft 2020-12 JSON Schema for plugin meta & manifests
+scripts/build-index.mjs              # Zero-dependency validator & index.json builder
+tests/                               # Node.js 24 unit tests with faithful mock globalThis.fc
+index.json                           # Generated marketplace index (auto-updated on main)
 ```
 
-## Plugin Runtimes (Protocol v1)
+## Local Validation & Testing
 
-- **Built-in (`runtime: "builtin"`, `v0.3.0+`)**: First-party Rust plugins compiled into the FeedCourier binary (such as `link-rewrite`).
-- **HTTP Bridge (`runtime: "bridge"`, `v0.3.1+`)**: Out-of-process sidecar / microservice containers implementing custom **Channel Plugins** (`kind: "channel"`, `/deliver`) or **Processor Plugins** (`kind: "processor"`, `on_render` / `on_delivered`). Register your bridge URL and shared HMAC secret directly in FeedCourier WebUI → **Plugins → Add Bridge Plugin** — only the registered `host:port` is contacted directly without relaxing `SSRF_ALLOWLIST`.
-
-## Local Validation & Tests
-
-Requires **Node.js 24+** (zero external npm dependencies):
+Requires **Node.js 24+** (zero external npm packages):
 
 ```bash
-# Validate schemas and all registry/*.json files
+# Validate schema, plugin sources, exports, and templates
 node scripts/build-index.mjs --check
 
-# Rebuild index.json locally and verify freshness
+# Rebuild index.json and verify freshness
 node scripts/build-index.mjs && node scripts/build-index.mjs --check --verify-index
 
-# Run reference bridge plugin unit tests
-node --test channels/*/*.test.mjs
+# Run unit tests
+node --test tests/*.test.mjs
 ```
 
-## Submitting a Plugin
+## Contributing a Plugin
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) and the [FeedCourier Plugin Development Guide](https://feedcourier.ellery.me/plugins/development) for full submission requirements.
+See [CONTRIBUTING.md](./CONTRIBUTING.md), [`docs/plugin-api/v1.md`](./docs/plugin-api/v1.md), and starter templates in [`templates/`](./templates/).
 
 ## License
 

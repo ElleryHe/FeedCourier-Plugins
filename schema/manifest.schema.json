@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/ElleryHe/FeedCourier-Plugins/main/schema/manifest.schema.json",
-  "title": "FeedCourier Plugin Registry Manifest (Protocol v1)",
-  "description": "Strict manifest schema for plugins listed in the ElleryHe/FeedCourier-Plugins marketplace registry.",
+  "title": "FeedCourier Plugin Manifest & Meta Schema (Plugin API v1)",
+  "description": "Strict schema for FeedCourier built-in plugin manifests (plugins/builtin/<id>/manifest.json) and single-file JS plugin `export const meta` declarations (plugins/<channels|processors>/<id>/<version>/plugin.js).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -18,39 +18,40 @@
     "homepage",
     "repository",
     "hooks",
-    "permissions"
+    "permissions",
+    "allowed_hosts"
   ],
   "properties": {
     "id": {
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9_-]{1,63}$",
-      "description": "Globally unique lowercase plugin identifier (2–64 chars, lowercase letters/digits/hyphens/underscores). Must match registry/<id>.json."
+      "description": "Globally unique lowercase plugin identifier (2–64 chars, lowercase letters, digits, hyphens, underscores). Must match the plugin directory name."
     },
     "name": {
       "type": "string",
       "minLength": 2,
       "maxLength": 80,
-      "description": "Human-readable plugin display name shown in the FeedCourier WebUI and documentation site."
+      "description": "Human-readable plugin display name shown in the FeedCourier WebUI and marketplace."
     },
     "version": {
       "type": "string",
       "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$",
-      "description": "Semantic Version (SemVer 2.0.0) of this plugin release."
+      "description": "Semantic Version (SemVer 2.0.0) of this plugin release. For JS plugins, must match the version directory name."
     },
     "api_version": {
       "type": "string",
       "const": "1",
-      "description": "FeedCourier Plugin Protocol version. Must be \"1\"."
+      "description": "FeedCourier Plugin API version. Must be \"1\"."
     },
     "kind": {
       "type": "string",
-      "enum": ["builtin", "processor", "channel", "external", "coming_soon"],
-      "description": "Plugin kind: builtin (compiled into FeedCourier), processor (on_render/on_delivered bridge), channel (custom delivery channel bridge), external (third-party), or coming_soon."
+      "enum": ["builtin", "channel", "processor"],
+      "description": "Plugin kind: builtin (first-party Rust plugin compiled into FeedCourier), channel (single-file JS delivery channel), or processor (single-file JS on_render / on_delivered processor)."
     },
     "runtime": {
       "type": "string",
-      "enum": ["builtin", "bridge"],
-      "description": "Execution runtime: builtin (in-process Rust) or bridge (out-of-process HTTP Bridge Protocol v1 sidecar)."
+      "enum": ["builtin", "js"],
+      "description": "Execution runtime: builtin (in-process Rust) or js (embedded sandboxed single-file ES Module). Required as \"builtin\" in plugins/builtin/*/manifest.json; inferred as \"js\" for plugin.js modules."
     },
     "min_core": {
       "type": "string",
@@ -68,7 +69,7 @@
         "security",
         "other"
       ],
-      "description": "Marketplace category used for filtering in the WebUI and docs site."
+      "description": "Marketplace category used for filtering in the WebUI and documentation site."
     },
     "icon": {
       "type": "string",
@@ -76,10 +77,31 @@
       "description": "Lucide icon slug rendered on marketplace cards (e.g., \"link\", \"bell\", \"sparkles\", \"shield\")."
     },
     "description": {
-      "type": "string",
-      "minLength": 10,
-      "maxLength": 280,
-      "description": "Concise single-paragraph summary of what the plugin does."
+      "description": "Concise summary of what the plugin does. Either an English string or a localized { en, zh } object.",
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 280
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["en"],
+          "properties": {
+            "en": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 280
+            },
+            "zh": {
+              "type": "string",
+              "minLength": 4,
+              "maxLength": 280
+            }
+          }
+        }
+      ]
     },
     "homepage": {
       "type": "string",
@@ -93,17 +115,14 @@
       "pattern": "^https://",
       "description": "HTTPS source code repository URL."
     },
-    "image": {
-      "type": "string",
-      "minLength": 3,
-      "maxLength": 200,
-      "description": "Optional OCI/Docker container image reference for deploying a bridge sidecar."
-    },
-    "compose_snippet": {
-      "type": "string",
-      "minLength": 10,
-      "maxLength": 2000,
-      "description": "Optional Docker Compose YAML snippet showing how to run the bridge sidecar alongside FeedCourier."
+    "allowed_hosts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^(?:\\*\\.)?[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$"
+      },
+      "description": "Normalized lowercase bare hostnames or '*.example.com' patterns that this JS plugin is allowed to contact by default via fc.fetch (no scheme, port, path, credentials, or metadata IPs)."
     },
     "hooks": {
       "type": "array",
@@ -113,7 +132,7 @@
         "type": "string",
         "enum": ["on_render", "on_ingest", "on_delivered"]
       },
-      "description": "Protocol v1 lifecycle hooks implemented by this plugin (required non-empty for builtin/processor plugins; optional for channel plugins)."
+      "description": "Plugin API v1 lifecycle hooks implemented by this plugin (required non-empty for builtin/processor plugins; empty for channel plugins)."
     },
     "permissions": {
       "type": "array",
@@ -126,11 +145,19 @@
     },
     "account_schema": {
       "type": "object",
-      "description": "Optional JSON Schema describing account-level configuration fields for channel plugins."
+      "description": "JSON Schema describing account-level configuration fields for channel plugins."
     },
     "destination_schema": {
       "type": "object",
-      "description": "Optional JSON Schema describing destination-level configuration fields for channel plugins."
+      "description": "JSON Schema describing destination-level configuration fields for channel plugins."
+    },
+    "instance_schema": {
+      "type": "object",
+      "description": "JSON Schema describing provider/instance configuration fields for processor plugins."
+    },
+    "route_option_schema": {
+      "type": "object",
+      "description": "JSON Schema describing per-route option controls for processor plugins."
     },
     "capabilities": {
       "type": "object",

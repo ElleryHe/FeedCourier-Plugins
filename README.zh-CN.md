@@ -1,56 +1,63 @@
-# FeedCourier 插件市场注册表
+# FeedCourier 插件市场
 
-**[FeedCourier](https://github.com/ElleryHe/FeedCourier)**（`v0.3.0+`）官方插件市场索引仓库、**Plugin Protocol v1** 协议规范与参考 HTTP 桥接通道插件。
+**[FeedCourier](https://github.com/ElleryHe/FeedCourier)**（`v0.3.1+`）官方单文件 JavaScript 插件市场、**Plugin API v1** 协议规范与内置插件目录。
 
-[English](./README.md) | **简体中文** | [FeedCourier 插件文档](https://feedcourier.ellery.me/zh/plugins/)
+[English](./README.md) | **简体中文** | [Plugin API v1 规范](./docs/plugin-api/v1.md) | [市场索引规范](./docs/marketplace.md)
 
 ---
 
-## 市场索引与桥接协议
+## 核心特性
 
-1. 每个插件条目以独立的 JSON 文件存放在 [`registry/<id>.json`](./registry/) 目录下，严格遵循 [`schema/manifest.schema.json`](./schema/manifest.schema.json)（JSON Schema Draft 2020-12，插件协议 `api_version: "1"`）。
-2. 进程外 **HTTP 桥接插件**（`runtime: "bridge"`，`FeedCourier >= 0.3.1`）遵循 [`schema/bridge-protocol.schema.json`](./schema/bridge-protocol.schema.json)（提供 `GET /manifest`、`POST /validate`、`POST /test`、`POST /deliver`、`POST /hooks/on_render`、`POST /hooks/on_delivered`，并使用 `±300s` 时间窗的 HMAC-SHA256 签名认证）。
-3. 每次提交 Pull Request 时，GitHub Actions 会运行 `node scripts/build-index.mjs --check` 校验清单，并运行 `node --test channels/*/*.test.mjs` 执行零依赖通道桥接单元测试。
-4. PR 合并至 `main` 后，GitHub Actions 会自动重建并提交聚合索引 [`index.json`](./index.json)。运行中的 FeedCourier 实例通过防 SSRF 客户端拉取该索引（6 小时缓存，离线时回退至内置快照）。
+- **单文件 JS 插件（`plugin.js`）**：每个通道或处理插件版本均为独立的单文件 ES Module，直接运行于 FeedCourier 内置纯 ECMAScript 安全沙箱中（通过 `globalThis.fc` 调用受 SSRF 保护的网络与编解码能力）——**无需 Docker sidecar，无需在生产环境部署 Node.js，WebUI 一键安装升级**。
+- **SHA-256 完整性校验**：[`scripts/build-index.mjs`](./scripts/build-index.mjs) 自动检查零 `import` 与沙箱合规性、校验 `meta` 导出、计算 `plugin.js` 精确 `sha256` 并生成 [`index.json`](./index.json)。
+- **零外部依赖工具链**：校验、索引构建与单元测试仅依赖 **Node.js 24+** 内置能力。
+
+## 官方插件一览
+
+| 插件 | 类型 | 运行时 | 简介 |
+| --- | --- | --- | --- |
+| [**Bark 推送（Bark Push）**](./plugins/channels/bark/README.zh-CN.md) | `channel` | `js` | 通过 Bark（官方 `api.day.app` 或自建服务端）向 iOS/macOS 推送参考 Telegram 摘要模式排版的文章卡片 |
+| [**ntfy 推送（ntfy Push）**](./plugins/channels/ntfy/README.zh-CN.md) | `channel` | `js` | 向 `ntfy.sh` 或自建 ntfy 服务器推送 RSS 文章通知，支持优先级、标签与 Bearer Token 认证 |
+| [**链接替换（YOURLS）**](./plugins/builtin/link-rewrite/README.zh-CN.md) | `builtin` | `builtin` | 在渲染阶段通过自建 YOURLS 服务重写文章链接，内置 SQLite 缓存与严格重试模式 |
 
 ## 仓库目录结构
 
 ```text
-schema/manifest.schema.json          # 插件协议 v1 清单 JSON Schema (Draft 2020-12)
-schema/bridge-protocol.schema.json   # HTTP 桥接协议 v1 请求/响应 Schema
-registry/link-rewrite.json           # 官方内置「链接替换 (YOURLS)」处理插件清单
-registry/ntfy.json                   # 官方参考「ntfy Push」HTTP 桥接通道插件清单
-channels/channel-template/           # 零依赖 Node.js 24 通道插件模板 + Dockerfile + 单元测试
-channels/ntfy/                       # 参考 ntfy 通道桥接实现 + Dockerfile + 单元测试
-scripts/build-index.mjs              # 零依赖 Node.js 24+ 校验与索引构建脚本
-index.json                           # 聚合生成的市场索引（合入 main 后自动更新）
-.github/workflows/validate.yml       # PR 清单校验与通道桥接单元测试工作流
-.github/workflows/build-index.yml    # main 分支自动构建并提交 index.json 工作流
+plugins/
+  builtin/link-rewrite/              # 官方内置 Rust 插件清单与文档
+  channels/ntfy/0.3.1/plugin.js      # 官方 ntfy Push 通道插件
+  channels/bark/0.3.1/plugin.js      # 官方 Bark Push 通道插件（摘要卡片风格）
+docs/
+  marketplace.md                     # 市场结构与 index.json 索引说明
+  plugin-api/v1.md                   # Plugin API v1 开发文档
+  plugin-api/v1.d.ts                 # globalThis.fc 与插件钩子的 TypeScript 类型定义
+templates/
+  channel-plugin.example.js          # 单文件通道插件起步模板
+  processor-plugin.example.js        # 单文件处理插件起步模板
+schema/manifest.schema.json          # 插件清单与 meta 的 JSON Schema (Draft 2020-12)
+scripts/build-index.mjs              # 零依赖校验与 index.json 构建脚本
+tests/                               # 基于模拟 globalThis.fc 的 Node.js 24 单元测试
+index.json                           # 聚合市场索引（合入 main 后自动更新）
 ```
-
-## 插件运行时模型（Protocol v1）
-
-- **内置插件（`runtime: "builtin"`，`v0.3.0+`）**：第一方 Rust 插件直接编译进 FeedCourier 单文件二进制（如 `link-rewrite`）。
-- **HTTP 桥接插件（`runtime: "bridge"`，`v0.3.1+`）**：以独立 sidecar / 容器运行的进程外扩展，支持自定义**投递通道插件**（`kind: "channel"`，实现 `/deliver`）与**处理插件**（`kind: "processor"`，实现 `on_render` / `on_delivered`）。管理员在 FeedCourier WebUI → **插件中心 → 添加桥接插件** 中登记桥接 URL 与共享密钥即可接入；FeedCourier 仅直连已登记的 `host:port`，不会放宽全局 `SSRF_ALLOWLIST`。
 
 ## 本地校验与测试
 
 只需 **Node.js 24+**（零外部依赖）：
 
 ```bash
-# 校验 Schema 与所有 registry/*.json
+# 校验 Schema、插件源码沙箱合规性与模块导出
 node scripts/build-index.mjs --check
 
 # 重建 index.json 并校验一致性
 node scripts/build-index.mjs && node scripts/build-index.mjs --check --verify-index
 
-# 运行通道桥接插件单元测试
-node --test channels/*/*.test.mjs
+# 运行插件单元测试
+node --test tests/*.test.mjs
 ```
 
 ## 提交插件上架
 
-请阅读 [CONTRIBUTING.md](./CONTRIBUTING.md) 与 [FeedCourier 插件开发手册](https://feedcourier.ellery.me/zh/plugins/development)。
+请阅读 [CONTRIBUTING.md](./CONTRIBUTING.md)、[`docs/plugin-api/v1.md`](./docs/plugin-api/v1.md) 并参考 [`templates/`](./templates/) 中的模板。
 
 ## 开源协议
 
