@@ -5,6 +5,7 @@ on:
     paths:
       - "registry/**"
       - "schema/**"
+      - "channels/**"
       - "index.json"
       - "scripts/build-index.mjs"
       - ".github/workflows/validate.yml"
@@ -14,6 +15,7 @@ on:
     paths:
       - "registry/**"
       - "schema/**"
+      - "channels/**"
       - "index.json"
       - "scripts/build-index.mjs"
       - ".github/workflows/validate.yml"
@@ -28,7 +30,7 @@ concurrency:
 
 jobs:
   validate:
-    name: Validate Manifests (Node 24)
+    name: Validate Manifests & Bridge Tests (Node 24)
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
@@ -56,3 +58,6 @@ jobs:
       - name: Validate plugin manifests and verify index.json freshness
         if: github.event_name != 'pull_request'
         run: node scripts/build-index.mjs --check --verify-index
+
+      - name: Run zero-dependency channel bridge unit tests
+        run: node --test channels/*/*.test.mjs

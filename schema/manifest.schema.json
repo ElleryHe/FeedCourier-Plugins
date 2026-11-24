@@ -44,8 +44,13 @@
     },
     "kind": {
       "type": "string",
-      "enum": ["builtin", "external", "coming_soon"],
-      "description": "Distribution kind: builtin (compiled into FeedCourier), external (third-party), or coming_soon (planned listing)."
+      "enum": ["builtin", "processor", "channel", "external", "coming_soon"],
+      "description": "Plugin kind: builtin (compiled into FeedCourier), processor (on_render/on_delivered bridge), channel (custom delivery channel bridge), external (third-party), or coming_soon."
+    },
+    "runtime": {
+      "type": "string",
+      "enum": ["builtin", "bridge"],
+      "description": "Execution runtime: builtin (in-process Rust) or bridge (out-of-process HTTP Bridge Protocol v1 sidecar)."
     },
     "min_core": {
       "type": "string",
@@ -68,7 +73,7 @@
     "icon": {
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9-]{0,31}$",
-      "description": "Lucide icon slug rendered on marketplace cards (e.g., \"link\", \"sparkles\", \"shield\")."
+      "description": "Lucide icon slug rendered on marketplace cards (e.g., \"link\", \"bell\", \"sparkles\", \"shield\")."
     },
     "description": {
       "type": "string",
@@ -88,15 +93,27 @@
       "pattern": "^https://",
       "description": "HTTPS source code repository URL."
     },
+    "image": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 200,
+      "description": "Optional OCI/Docker container image reference for deploying a bridge sidecar."
+    },
+    "compose_snippet": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 2000,
+      "description": "Optional Docker Compose YAML snippet showing how to run the bridge sidecar alongside FeedCourier."
+    },
     "hooks": {
       "type": "array",
-      "minItems": 1,
+      "minItems": 0,
       "uniqueItems": true,
       "items": {
         "type": "string",
         "enum": ["on_render", "on_ingest", "on_delivered"]
       },
-      "description": "Protocol v1 lifecycle hooks implemented by this plugin (on_render active in v0.3.0; on_ingest and on_delivered reserved)."
+      "description": "Protocol v1 lifecycle hooks implemented by this plugin (required non-empty for builtin/processor plugins; optional for channel plugins)."
     },
     "permissions": {
       "type": "array",
@@ -105,7 +122,19 @@
         "type": "string",
         "enum": ["network"]
       },
-      "description": "Capabilities declared by the plugin. Network calls must pass through FeedCourier's SSRF-protected HTTP client."
+      "description": "Capabilities declared by the plugin."
+    },
+    "account_schema": {
+      "type": "object",
+      "description": "Optional JSON Schema describing account-level configuration fields for channel plugins."
+    },
+    "destination_schema": {
+      "type": "object",
+      "description": "Optional JSON Schema describing destination-level configuration fields for channel plugins."
+    },
+    "capabilities": {
+      "type": "object",
+      "description": "Optional channel adapter capabilities metadata (e.g. supports_html, max_text_len)."
     }
   }
 }

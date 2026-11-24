@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..");
 const SCHEMA_PATH = join(REPO_ROOT, "schema", "manifest.schema.json");
+const BRIDGE_SCHEMA_PATH = join(REPO_ROOT, "schema", "bridge-protocol.schema.json");
 const REGISTRY_DIR = join(REPO_ROOT, "registry");
 const INDEX_PATH = join(REPO_ROOT, "index.json");
 
@@ -157,7 +158,21 @@ function validateManifestAgainstSchema(manifest, fileName, schema) {
           }
         }
       }
+    } else if (propSchema.type === "object") {
+      if (val === null || typeof val !== "object" || Array.isArray(val)) {
+        errors.push(`"${key}" must be a JSON object`);
+      }
     }
+  }
+
+  // Channel plugins implement /deliver and may declare an empty hooks array;
+  // builtin and processor plugins must declare at least one hook.
+  if (
+    (manifest.kind === "builtin" || manifest.kind === "processor") &&
+    Array.isArray(manifest.hooks) &&
+    manifest.hooks.length === 0
+  ) {
+    errors.push(`"hooks" must contain at least 1 hook for kind "${manifest.kind}"`);
   }
 
   // Explicit semantic checks in addition to JSON Schema assertions.
@@ -185,21 +200,31 @@ function validateManifestAgainstSchema(manifest, fileName, schema) {
 }
 
 function canonicalizeManifest(manifest) {
-  return {
+  const out = {
     id: manifest.id,
     name: manifest.name,
     version: manifest.version,
     api_version: manifest.api_version,
     kind: manifest.kind,
-    min_core: manifest.min_core,
-    category: manifest.category,
-    icon: manifest.icon,
-    description: manifest.description,
-    homepage: manifest.homepage,
-    repository: manifest.repository,
-    hooks: manifest.hooks,
-    permissions: manifest.permissions,
   };
+  if (typeof manifest.runtime === "string") {
+    out.runtime = manifest.runtime;
+  }
+  out.min_core = manifest.min_core;
+  out.category = manifest.category;
+  out.icon = manifest.icon;
+  out.description = manifest.description;
+  out.homepage = manifest.homepage;
+  out.repository = manifest.repository;
+  if (typeof manifest.image === "string") {
+    out.image = manifest.image;
+  }
+  if (typeof manifest.compose_snippet === "string") {
+    out.compose_snippet = manifest.compose_snippet;
+  }
+  out.hooks = manifest.hooks;
+  out.permissions = manifest.permissions;
+  return out;
 }
 
 function main() {
@@ -208,6 +233,14 @@ function main() {
     throw new Error(
       `Expected Draft 2020-12 schema in schema/manifest.schema.json (got ${JSON.stringify(schema.$schema)})`,
     );
+  }
+  if (existsSync(BRIDGE_SCHEMA_PATH)) {
+    const bridgeSchema = readJsonFile(BRIDGE_SCHEMA_PATH, "bridge protocol schema");
+    if (bridgeSchema.$schema !== "https://json-schema.org/draft/2020-12/schema") {
+      throw new Error(
+        `Expected Draft 2020-12 schema in schema/bridge-protocol.schema.json (got ${JSON.stringify(bridgeSchema.$schema)})`,
+      );
+    }
   }
 
   if (!existsSync(REGISTRY_DIR)) {
