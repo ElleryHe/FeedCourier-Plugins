@@ -55,9 +55,20 @@ jobs:
         if: github.event_name == 'pull_request'
         run: node scripts/build-index.mjs --check
 
-      - name: Validate plugin manifests and verify index.json freshness
+      - name: Validate plugin manifests (and verify index.json freshness when not pending auto-rebuild)
         if: github.event_name != 'pull_request'
-        run: node scripts/build-index.mjs --check --verify-index
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            node scripts/build-index.mjs --check --verify-index
+            exit 0
+          fi
+          CHANGED="$(git diff --name-only HEAD~1 HEAD 2>/dev/null || true)"
+          if printf '%s\n' "${CHANGED}" | grep -Eq '^(registry/|schema/|scripts/build-index\.mjs$)' && ! printf '%s\n' "${CHANGED}" | grep -qx 'index.json'; then
+            echo "Registry/schema changed without index.json (merged PR; build-index.yml rebuilds index.json asynchronously); running schema validation without --verify-index."
+            node scripts/build-index.mjs --check
+          else
+            node scripts/build-index.mjs --check --verify-index
+          fi
 
       - name: Run zero-dependency channel bridge unit tests
         run: node --test channels/*/*.test.mjs

@@ -35,7 +35,7 @@ jobs:
           node-version: 24
 
       - name: Validate manifests and run bridge tests
-        run: node scripts/build-index.mjs --check --verify-index && node --test channels/*/*.test.mjs
+        run: node scripts/build-index.mjs --check && node --test channels/*/*.test.mjs
 
       - name: Resolve plugin version and GHCR image name
         id: meta
