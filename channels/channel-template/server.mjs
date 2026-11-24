@@ -12,7 +12,9 @@
  */
 
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { realpathSync } from "node:fs";
 import { createServer } from "node:http";
+import { pathToFileURL } from "node:url";
 
 export const SIGNATURE_WINDOW_SECS = 300;
 export const MAX_REQUEST_BYTES = 1024 * 1024; // 1 MiB
@@ -306,7 +308,7 @@ async function defaultDeliver({ idempotency_key, entry, destination }) {
 }
 
 // Start HTTP server only when executed directly (`node server.mjs`).
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   const secret = process.env.BRIDGE_SECRET?.trim();
   if (!secret) {
     console.error("Error: BRIDGE_SECRET environment variable must be set.");
