@@ -12,7 +12,9 @@ Official reference HTTP Bridge channel plugin (`Plugin Protocol v1`) for deliver
 ```yaml
 services:
   feedcourier-ntfy:
-    build: ./channels/ntfy
+    image: ghcr.io/elleryhe/feedcourier-plugin-ntfy:latest
+    # Or build directly from source:
+    # build: ./channels/ntfy
     environment:
       BRIDGE_SECRET: "replace-with-strong-secret"
       PORT: "8787"
@@ -20,6 +22,8 @@ services:
 ```
 
 Register `http://feedcourier-ntfy:8787` and your `BRIDGE_SECRET` in FeedCourier WebUI → **Plugins → Add Bridge Plugin**, then create an **ntfy Push** channel account under **Channels**.
+
+To migrate the sidecar address or rotate `BRIDGE_SECRET` later without deleting existing channels or routes, use **Plugins → Edit Connection** (`PATCH /api/v1/plugins/ntfy`), which verifies the new connection with a live signed `GET /manifest` probe before saving.
 
 ## Run Tests
 

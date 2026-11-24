@@ -7,7 +7,9 @@
  */
 
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { realpathSync } from "node:fs";
 import { createServer } from "node:http";
+import { pathToFileURL } from "node:url";
 
 export const SIGNATURE_WINDOW_SECS = 300;
 export const MAX_REQUEST_BYTES = 1024 * 1024;
@@ -130,7 +132,25 @@ function parseRetryAfterSecs(header) {
   return undefined;
 }
 
-function normalizeServerUrl(raw) {
+export function truncateUtf8Bytes(input, maxBytes = MAX_NTFY_TEXT_LEN) {
+  const text = String(input ?? "");
+  if (Buffer.byteLength(text, "utf8") <= maxBytes) {
+    return text;
+  }
+  let out = "";
+  let used = 0;
+  for (const ch of text) {
+    const bytes = Buffer.byteLength(ch, "utf8");
+    if (used + bytes > maxBytes) {
+      break;
+    }
+    out += ch;
+    used += bytes;
+  }
+  return out;
+}
+
+export function normalizeServerUrl(raw) {
   const trimmed = String(raw ?? "").trim();
   let parsed;
   try {
@@ -141,6 +161,11 @@ function normalizeServerUrl(raw) {
   if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || !parsed.hostname) {
     return null;
   }
+  if (parsed.username || parsed.password) {
+    return null;
+  }
+  parsed.search = "";
+  parsed.hash = "";
   return parsed.toString().replace(/\/+$/, "");
 }
 
@@ -233,7 +258,10 @@ export async function publishToNtfy(fetchImpl, { account, destination, title, bo
     headers.Tags = sanitizeHeaderValue(destination.tags, 256);
   }
 
-  const textBody = String(body ?? "").trim().slice(0, MAX_NTFY_TEXT_LEN) || cleanTitle || "New item";
+  const textBody =
+    truncateUtf8Bytes(String(body ?? "").trim(), MAX_NTFY_TEXT_LEN) ||
+    truncateUtf8Bytes(cleanTitle, MAX_NTFY_TEXT_LEN) ||
+    "New item";
 
   let resp;
   try {
@@ -241,6 +269,7 @@ export async function publishToNtfy(fetchImpl, { account, destination, title, bo
       method: "POST",
       headers,
       body: textBody,
+      redirect: "error",
       signal: AbortSignal.timeout(20_000),
     });
   } catch (err) {
@@ -354,11 +383,20 @@ export function createNtfyBridgeServer({ secret, fetchImpl = globalThis.fetch } 
           if (!serverUrl) {
             return sendJson(res, 400, { ok: false, error: "Invalid server_url" });
           }
-          const healthResp = await fetchImpl(`${serverUrl}/v1/health`, {
-            method: "GET",
-            headers: buildNtfyAuthHeaders(payload.account),
-            signal: AbortSignal.timeout(8_000),
-          });
+          let healthResp;
+          try {
+            healthResp = await fetchImpl(`${serverUrl}/v1/health`, {
+              method: "GET",
+              headers: buildNtfyAuthHeaders(payload.account),
+              redirect: "error",
+              signal: AbortSignal.timeout(8_000),
+            });
+          } catch (err) {
+            return sendJson(res, 502, {
+              ok: false,
+              error: `ntfy health check failed: ${err?.message ?? String(err)}`,
+            });
+          }
           if (!healthResp.ok) {
             return sendJson(res, 502, {
               ok: false,
@@ -409,7 +447,7 @@ export function createNtfyBridgeServer({ secret, fetchImpl = globalThis.fetch } 
   });
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   const secret = process.env.BRIDGE_SECRET?.trim();
   if (!secret) {
     console.error("Error: BRIDGE_SECRET environment variable must be set.");

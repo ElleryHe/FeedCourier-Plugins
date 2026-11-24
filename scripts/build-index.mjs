@@ -19,7 +19,7 @@ const BRIDGE_SCHEMA_PATH = join(REPO_ROOT, "schema", "bridge-protocol.schema.jso
 const REGISTRY_DIR = join(REPO_ROOT, "registry");
 const INDEX_PATH = join(REPO_ROOT, "index.json");
 
-const ID_REGEX = /^[a-z0-9][a-z0-9-]{1,47}$/;
+const ID_REGEX = /^[a-z0-9][a-z0-9_-]{1,63}$/;
 const SEMVER_REGEX =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
@@ -199,6 +199,10 @@ function validateManifestAgainstSchema(manifest, fileName, schema) {
   return errors;
 }
 
+function isPlainObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 function canonicalizeManifest(manifest) {
   const out = {
     id: manifest.id,
@@ -224,6 +228,15 @@ function canonicalizeManifest(manifest) {
   }
   out.hooks = manifest.hooks;
   out.permissions = manifest.permissions;
+  if (isPlainObject(manifest.account_schema)) {
+    out.account_schema = manifest.account_schema;
+  }
+  if (isPlainObject(manifest.destination_schema)) {
+    out.destination_schema = manifest.destination_schema;
+  }
+  if (isPlainObject(manifest.capabilities)) {
+    out.capabilities = manifest.capabilities;
+  }
   return out;
 }
 

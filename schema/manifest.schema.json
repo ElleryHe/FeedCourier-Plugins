@@ -23,8 +23,8 @@
   "properties": {
     "id": {
       "type": "string",
-      "pattern": "^[a-z0-9][a-z0-9-]{1,47}$",
-      "description": "Globally unique lowercase kebab-case plugin identifier (2–48 chars). Must match registry/<id>.json."
+      "pattern": "^[a-z0-9][a-z0-9_-]{1,63}$",
+      "description": "Globally unique lowercase plugin identifier (2–64 chars, lowercase letters/digits/hyphens/underscores). Must match registry/<id>.json."
     },
     "name": {
       "type": "string",
